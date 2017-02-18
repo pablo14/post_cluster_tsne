@@ -1,0 +1,64 @@
+This is an experiment of combining the result of t-SNE with two well known clustering techniques: **k-means** and **hierarchical**, both present in base R. 
+
+For those who don't know **t-SNE** technique (<a href="https://lvdmaaten.github.io/tsne/" target="blank">official site</a>), it's a projection technique -or dimension reduction- similar in some aspects to Principal Component Analysis, so we can visualize N variables into -for example- 2.
+
+Since the result of t-SNE is a matrix of two dimensions, where each dot reprent an input case, we can apply a clustering technique such as the two mentioned before, in order to group the cases according to their distance in this 2-dimension map. 
+
+t-SNE puts similar cases together, handling non-linearities in data very well. From this perspective it can helps to make the cluster more accurate because it converts data into a 2-dimension space where dots are in a circular shape (which pleases to k-means and it's one of its weak points where creating the segments, check <a href="http://varianceexplained.org/r/kmeans-free-lunch/" target="blank">this link</a> for more information).
+
+There are other clustering techniques HDBSCAN which base its process in densities of points. 
+<a href="http://nbviewer.jupyter.org/github/lmcinnes/hdbscan/blob/master/notebooks/Comparing%20Clustering%20Algorithms.ipynb" target="blank">link</a>
+
+```{r}
+library(caret)
+library(Rtsne)
+
+# Download data from: https://github.com/pablo14/post_cluster_tsne/blob/master/data_1.txt
+data_tsne=read.delim("data_1.txt", header = T, stringsAsFactors = F, sep = "\t")
+
+# Rtsne function may take some minutes to complete...
+set.seed(9)
+tsne_model_1 = Rtsne(as.matrix(data_tsne), check_duplicates=FALSE, pca=TRUE, perplexity=30, theta=0.5, dims=2)
+
+# getting the two dimension matrix
+d_tsne_1 = as.data.frame(tsne_model_1$Y)
+
+# plotting the results without clustering
+ggplot(d_tsne_1, aes(x=V1, y=V2)) +
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("t-SNE") +
+  theme_light(base_size=20) +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
+  scale_colour_brewer(palette = "Set2")
+
+
+## Creating k-means clustering model, and assigning the result to the tsne data
+d_tsne_1_original=d_tsne_1
+fit_cluster_kmeans=kmeans(scale(data.frame(d_tsne_1)), 3)
+d_tsne_1_original$cluster_k = as.factor(fit_cluster_kmeans$cluster)
+# following line is to make sure the colors assigned to cluster numbers are the same between two models
+d_tsne_1_original$cluster_k=ifelse(d_tsne_1_original$cluster_k=="2", "3", ifelse(d_tsne_1_original$cluster_k=="3", "2", d_tsne_1_original$cluster_k))
+
+## Creating hierarchical cluster model, and assigning the result to the tsne data
+fit_cluster_hierarchical=hclust(dist(scale(data.frame(d_tsne_1))))
+d_tsne_1_original$cluster_h = as.factor(cutree(fit_cluster_hierarchical, k=3))
+
+plot_cluster=function(data, var_cluster)
+{
+  ggplot(data, aes_string(x="V1", y="V2", color=var_cluster)) +
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Cluster and t-SNE") +
+  theme_light(base_size=20) +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank()) + scale_colour_brewer(palette = "Set2")
+}
+
+plot_cluster(d_tsne_1_original, "cluster_k")
+plot_cluster(d_tsne_1_original, "cluster_h")
+
+```
